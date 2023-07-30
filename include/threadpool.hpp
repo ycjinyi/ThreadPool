@@ -5,7 +5,9 @@
 #include <memory>
 #include <mutex>
 #include <atomic>
+#include <functional>
 #include <condition_variable>
+#include <thread>
 
 //线程池的工作模式
 enum class PoolMode {
@@ -21,7 +23,11 @@ public:
 //线程类
 class Thread {
 public:
+    using ThreadFunc = std::function<void ()>;
+    Thread(ThreadFunc threadFunc);
+    void run();
 private:
+    ThreadFunc threadFunc_;
 };
 
 //线程池类
@@ -29,10 +35,21 @@ class ThreadPool {
 public:
     ThreadPool();
     ~ThreadPool();
+    //删除拷贝构造
+    ThreadPool(const ThreadPool&) = delete;
+    //删除拷贝赋值
+    ThreadPool& operator= (const ThreadPool&) = delete;
     //设置工作模式
     void setPoolMode(PoolMode poolMode);
+    //设置任务队列中任务的最大数
+    void setTaskQueMaxNum(uint taskQueNum);
+    //给线程池添加任务
+    void submitTask(std::shared_ptr<Task> task);
     //运行
-    void start();
+    void start(uint16_t threadNum);
+private:
+    //定义线程函数
+    void threadFunc();
 private:
     //线程列表
     std::vector<Thread*> threads_; 
