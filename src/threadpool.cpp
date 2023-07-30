@@ -27,23 +27,40 @@ void ThreadPool::setTaskQueMaxNum(uint taskQueNum) {
 }
 //给线程池添加任务, 用户调用，作为生产者
 void ThreadPool::submitTask(std::shared_ptr<Task> task) {
-
+    std::unique_lock<std::mutex> ulock(taskQueMutex_);
+    while(taskQueNum_ == taskQueMaxNum_) {
+        taskQueNotFull_.wait(ulock);
+    }
+    taskQue_.push(task);
+    ++taskQueNum_;
+    taskQueNotEmpty_.notify_all();
 }
 //定义线程函数, 线程执行, 作为消费者
 void ThreadPool::threadFunc() {
-    //从任务队列中获取任务并执行
-    std::cout << std::this_thread::get_id() << std::endl;
+    while(true) {
+        std::shared_ptr<Task> task(nullptr);
+        {
+            std::unique_lock<std::mutex> ulock(taskQueMutex_);
+            while(taskQueNum_ == 0) {
+                taskQueNotEmpty_.wait(ulock);
+            }
+            task = taskQue_.front();
+            taskQue_.pop();
+            --taskQueNum_;
+        }
+        taskQueNotFull_.notify_all();
+        if(task) task->run();
+     }
 }
 //运行
 void ThreadPool::start(uint16_t threadNum) {
     initThreadNum_ = threadNum;
     //创建线程
     for(int i = 0; i < initThreadNum_; ++i) {
-        threads_.emplace_back(new Thread(std::bind(&ThreadPool::threadFunc, this)));
+        std::unique_ptr<Task> ptr = 
+            std::make_unique<Task> (std::bind(&ThreadPool::threadFunc, this));
+        threads_.emplace_back(std::move(ptr));
     }
     //启动线程
-    for(Thread* thread: threads_) thread->run();
+    for(auto& thread: threads_) thread->run();
 }
-
-
-

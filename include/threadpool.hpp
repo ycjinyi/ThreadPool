@@ -52,7 +52,7 @@ private:
     void threadFunc();
 private:
     //线程列表
-    std::vector<Thread*> threads_; 
+    std::vector<std::unique_ptr<Task>> threads_; 
     //初始线程数量
     uint16_t initThreadNum_;
     //任务队列
