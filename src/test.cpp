@@ -6,7 +6,7 @@
 
 class MyTask: public Task {
 public:
-    void run() override {
+    Any run() override {
         std::cout << std::this_thread::get_id() << std::endl;
     }
 };

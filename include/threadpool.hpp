@@ -17,7 +17,7 @@ enum class PoolMode {
 //任务的抽象基类
 class Task {
 public:
-    virtual void run() = 0;
+    virtual Any run() = 0;
 };
 
 //线程类
@@ -71,4 +71,33 @@ private:
     std::condition_variable taskQueNotEmpty_;
 };
 
+//any类，用于接受任意的参数
+class Any {
+public:
+    //利用模板作为构造函数的参数，用于接收任意的数据类型
+    template<typename T>
+    Any(T data): base_(std::make_unique<Derive<T>> (data)) {}
+    //将Any类转为目标数据
+    template<typename T>
+    T cast() {
+        Derive<T>* dp = dynamic_cast<Derive<T>*> (base_.get());
+        if(dp == nullptr) {
+            throw "type is incompatible";
+        }
+        return dp->data_;
+    }
+private:
+    class Base {
+    public:
+        virtual ~Base() = default;
+    };
+    template<typename T>
+    class Derive: public Base {
+    public:
+        Derive(T data): data_(data) {}
+        T data_;
+    };
+private:
+    std::unique_ptr<Any::Base> base_;
+};
 #endif
