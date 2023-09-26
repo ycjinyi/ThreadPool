@@ -51,7 +51,7 @@ void ThreadPool::threadFunc() {
             taskQueNotFull_.notify_all();
         }
         if(task != nullptr) task->run();
-     }
+    }
 }
 //运行
 void ThreadPool::start(uint16_t threadNum) {
@@ -64,4 +64,4 @@ void ThreadPool::start(uint16_t threadNum) {
     }
     //启动线程
     for(auto& thread: threads_) thread->run();
-}
+} 
