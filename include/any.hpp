@@ -4,6 +4,7 @@
 //any类，用于接受任意的参数
 class Any {
 public:
+    Any() = default;
     //利用模板作为构造函数的参数，用于接收任意的数据类型
     template<typename T>
     Any(T data): base_(std::make_unique<Derive<T>> (data)) {}

@@ -7,18 +7,16 @@
 class MyTask: public Task {
 public:
     Any run() override {
-        std::cout << std::this_thread::get_id() << std::endl;
+        return 100;
     }
 };
 
 int main() {
     ThreadPool threadPool;
     threadPool.start(2);
-    threadPool.submitTask(std::make_shared<MyTask>());
-    threadPool.submitTask(std::make_shared<MyTask>());
-    threadPool.submitTask(std::make_shared<MyTask>());
-    threadPool.submitTask(std::make_shared<MyTask>());
-    threadPool.submitTask(std::make_shared<MyTask>());
+    Result res1 = threadPool.submitTask(std::make_shared<MyTask> ());
+    Result res2 = threadPool.submitTask(std::make_shared<MyTask> ());
+    std::cout << res1.get().cast<int>() + res2.get().cast<int>() << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(5));
     return 0;
 }
