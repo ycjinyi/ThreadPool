@@ -9,6 +9,9 @@
 #include <condition_variable>
 #include <thread>
 
+#include "any.hpp"
+#include "result.hpp"
+
 //线程池的工作模式
 enum class PoolMode {
     FIX_MODE, CACHED_MODE
@@ -17,7 +20,11 @@ enum class PoolMode {
 //任务的抽象基类
 class Task {
 public:
-    virtual void run() = 0;
+    void execute();
+    void setResult(Result*);
+    virtual Any run() = 0;
+private:
+    Result* result_;
 };
 
 //线程类
@@ -44,7 +51,7 @@ public:
     //设置任务队列中任务的最大数
     void setTaskQueMaxNum(uint taskQueNum);
     //给线程池添加任务
-    void submitTask(std::shared_ptr<Task> task);
+    Result submitTask(std::shared_ptr<Task> task);
     //运行
     void start(uint16_t threadNum);
 private:
@@ -70,5 +77,4 @@ private:
     std::condition_variable taskQueNotFull_;
     std::condition_variable taskQueNotEmpty_;
 };
-
 #endif

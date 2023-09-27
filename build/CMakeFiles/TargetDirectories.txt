@@ -1,5 +1,0 @@
-/home/ycjinyi/2023/threadpool/build/CMakeFiles/edit_cache.dir
-/home/ycjinyi/2023/threadpool/build/CMakeFiles/rebuild_cache.dir
-/home/ycjinyi/2023/threadpool/build/src/CMakeFiles/example.dir
-/home/ycjinyi/2023/threadpool/build/src/CMakeFiles/edit_cache.dir
-/home/ycjinyi/2023/threadpool/build/src/CMakeFiles/rebuild_cache.dir

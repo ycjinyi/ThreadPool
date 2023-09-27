@@ -25,16 +25,19 @@ void ThreadPool::setPoolMode(PoolMode poolMode) {
 void ThreadPool::setTaskQueMaxNum(uint taskQueNum) {
     taskQueMaxNum_ = taskQueNum;
 }
-//给线程池添加任务, 用户调用，作为生产者
-void ThreadPool::submitTask(std::shared_ptr<Task> task) {
+//给线程池添加任务, 用户调用，作为生产者，返回执行结果Result
+Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
     std::unique_lock<std::mutex> ulock(taskQueMutex_);
     //当lambda表达式为真, 就向下执行. 否则就阻塞在taskQueNotFull_条件变量上1s
     //如果1s后还是没有满足lambda表达式, 则返回false
     if(!taskQueNotFull_.wait_for(ulock, std::chrono::seconds(1), 
-        [&]() -> bool { return taskQueNum_ < taskQueMaxNum_; })) return;
+        [&]() -> bool { return taskQueNum_ < taskQueMaxNum_; })) {
+        return Result(task, false);
+    };
     taskQue_.push(task);
     ++taskQueNum_;
     taskQueNotEmpty_.notify_all();
+    return Result(task);
 }
 //定义线程函数, 线程执行, 作为消费者
 void ThreadPool::threadFunc() {
@@ -50,7 +53,7 @@ void ThreadPool::threadFunc() {
             if(taskQueNum_) taskQueNotEmpty_.notify_all();
             taskQueNotFull_.notify_all();
         }
-        if(task != nullptr) task->run();
+        if(task != nullptr) task->execute();
     }
 }
 //运行
@@ -65,3 +68,13 @@ void ThreadPool::start(uint16_t threadNum) {
     //启动线程
     for(auto& thread: threads_) thread->run();
 } 
+
+//-------------------------------Task------------------------------
+void Task::execute() {
+    if(result_ == nullptr) return;
+    // 执行任务并设置返回值
+    result_->setValue(run());
+}
+void Task::setResult(Result* result) {
+    result_ = result;
+}
