@@ -38,9 +38,8 @@ Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
         && idleThreadNum_ <= maxThreadNum_) {
         std::unique_ptr<Thread> ptr = 
             std::make_unique<Thread> (std::bind(&ThreadPool::threadFunc, this));
-        threads_.emplace_back(ptr);
         ++idleThreadNum_;
-        ptr->run();
+        threads_.emplace(ptr->run(), std::move(ptr));
     }
     return Result(task);
 }
