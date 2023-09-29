@@ -70,6 +70,7 @@
         "set": "cpp",
         "iomanip": "cpp",
         "shared_mutex": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "unordered_set": "cpp"
     }
 }

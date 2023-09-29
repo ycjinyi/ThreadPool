@@ -8,6 +8,7 @@
 #include <functional>
 #include <condition_variable>
 #include <thread>
+#include <unordered_set>
 
 #include "any.hpp"
 #include "result.hpp"
@@ -30,9 +31,9 @@ private:
 //线程类
 class Thread {
 public:
-    using ThreadFunc = std::function<void ()>;
+    using ThreadFunc = std::function<void (uint)>;
     Thread(ThreadFunc threadFunc);
-    std::thread::id run();    
+    void run(uint threadNumber); 
 private:
     ThreadFunc threadFunc_;
 };
@@ -52,12 +53,16 @@ public:
     void start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum_);
     void start(uint initThreaNum, PoolMode poolMode);
     void start(uint initThreadNum);
+    //获得线程编号
+    uint getThreadNumber();
 private:
     //定义线程函数
-    void threadFunc();
+    void threadFunc(uint);
+    //创建线程
+    void creatThread();
 private:
     //线程列表
-    std::unordered_map<std::thread::id, std::unique_ptr<Thread>> threads_; 
+    std::unordered_map<uint, std::unique_ptr<Thread>> threads_; 
     //初始线程数量
     uint initThreadNum_;
     //线程数量的上限值
@@ -83,5 +88,9 @@ private:
     //条件变量，用于生产者和消费者线程之间的同步
     std::condition_variable taskQueNotFull_;
     std::condition_variable taskQueNotEmpty_;
+    
+    //线程编号
+    uint threadNumber_;
+    std::unordered_set<uint> usedThreadNumbers_;
 };
 #endif
