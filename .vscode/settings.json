@@ -60,6 +60,16 @@
         "source_location": "cpp",
         "sstream": "cpp",
         "typeindex": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "codecvt": "cpp",
+        "csetjmp": "cpp",
+        "list": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "iomanip": "cpp",
+        "shared_mutex": "cpp",
+        "*.ipp": "cpp"
     }
 }

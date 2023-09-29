@@ -1,6 +1,6 @@
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
-#include <vector>
+#include <unordered_map>
 #include <queue>
 #include <memory>
 #include <mutex>
@@ -32,7 +32,7 @@ class Thread {
 public:
     using ThreadFunc = std::function<void ()>;
     Thread(ThreadFunc threadFunc);
-    void run();
+    std::thread::id run();    
 private:
     ThreadFunc threadFunc_;
 };
@@ -51,27 +51,32 @@ public:
     //运行
     void start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum_);
     void start(uint initThreaNum, PoolMode poolMode);
-    void start(unit initThreadNum);
+    void start(uint initThreadNum);
 private:
     //定义线程函数
     void threadFunc();
 private:
     //线程列表
-    std::vector<std::unique_ptr<Thread>> threads_; 
+    std::unordered_map<std::thread::id, std::unique_ptr<Thread>> threads_; 
     //初始线程数量
     uint initThreadNum_;
     //线程数量的上限值
     uint maxThreadNum_;
-    //任务队列
-    std::queue<std::shared_ptr<Task>> taskQue_;
-    //当前任务数量
-    std::atomic_uint taskQueNum_;
-    //任务的最大上限数
-    uint taskQueMaxNum_;
     //线程池的工作模式
     PoolMode poolMode_;
     //当前线程池是否已经启动
     std::atomic_bool isStarted_;
+    //当前空闲的线程数目
+    std::atomic_uint idleThreadNum_;
+    //当前线程的数目
+    std::atomic_uint nowThreadNum_;
+
+    //任务队列
+    std::queue<std::shared_ptr<Task>> taskQue_;
+    //当前任务数量
+    std::atomic_uint taskNum_;
+    //任务的最大上限数
+    uint taskQueMaxNum_;
     
     //互斥锁，用于保障任务队列的线程安全
     std::mutex taskQueMutex_;
