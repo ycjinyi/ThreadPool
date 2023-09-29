@@ -60,6 +60,8 @@ private:
     void threadFunc(uint);
     //创建线程
     void creatThread();
+    //移除线程对象
+    void removeThread(uint);
 private:
     //线程列表
     std::unordered_map<uint, std::unique_ptr<Thread>> threads_; 
@@ -75,6 +77,8 @@ private:
     std::atomic_uint idleThreadNum_;
     //当前线程的数目
     std::atomic_uint nowThreadNum_;
+    //销毁线程时用于线程数目的锁
+    std::mutex threadNumberMutex_;
 
     //任务队列
     std::queue<std::shared_ptr<Task>> taskQue_;
@@ -88,6 +92,8 @@ private:
     //条件变量，用于生产者和消费者线程之间的同步
     std::condition_variable taskQueNotFull_;
     std::condition_variable taskQueNotEmpty_;
+    //用于销毁线程时的唤醒
+    std::condition_variable removeThread_;
     
     //线程编号
     uint threadNumber_;

@@ -1,7 +1,7 @@
 #include "threadpool.hpp"
 #include <iostream>
 const uint TASK_QUE_MAX_NUM = 1024;
-const uint MAX_THREAD_IDLE_TIME_S = 10;
+const uint MAX_THREAD_IDLE_TIME_S = 3;
 
 //-------------------------------Thread------------------------------
 //创建线程对象，指定线程工作函数
@@ -21,7 +21,14 @@ ThreadPool::ThreadPool(): initThreadNum_(0), maxThreadNum_(0),
     nowThreadNum_(0), taskNum_(0), taskQueMaxNum_(TASK_QUE_MAX_NUM),
     threadNumber_(0) {}
 //析构函数
-ThreadPool::~ThreadPool() {}
+ThreadPool::~ThreadPool() {
+    isStarted_ = false;
+    //唤醒所有处于阻塞状态的线程
+    taskQueNotEmpty_.notify_all();
+    std::unique_lock<std::mutex> ulock(taskQueMutex_);
+    //阻塞在removeThread_条件变量上，直到所有的线程对象都被销毁
+    removeThread_.wait(ulock, [&]() -> bool { return nowThreadNum_ <= 0;});
+}
 //给线程池添加任务, 用户调用，作为生产者，返回执行结果Result
 Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
     std::unique_lock<std::mutex> ulock(taskQueMutex_);
@@ -45,13 +52,13 @@ Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
 //定义线程函数, 线程执行, 作为消费者
 void ThreadPool::threadFunc(uint threadNumber) {
     auto lastTime = std::chrono::high_resolution_clock::now();
-    while(true) {
+    while(isStarted_) {
         std::shared_ptr<Task> task(nullptr);
         {
             std::unique_lock<std::mutex> ulock(taskQueMutex_);
             //如果是cached模式，当线程总数大于初始线程数时，将回收空闲时间超过60s的线程
-            if(poolMode_ == PoolMode::CACHED_MODE && nowThreadNum_ > initThreadNum_) {
-                while(taskNum_ <= 0) {
+            if(poolMode_ == PoolMode::CACHED_MODE) {
+                while(isStarted_ && taskNum_ <= 0) {
                     if(std::cv_status::timeout ==
                         taskQueNotEmpty_.wait_for(ulock, std::chrono::seconds(1))) {
                         auto nowTime = std::chrono::high_resolution_clock::now();
@@ -59,18 +66,19 @@ void ThreadPool::threadFunc(uint threadNumber) {
                         //如果超时，将回收当前线程，并减少计数和线程map中保存的线程对象
                         if(duration.count() > MAX_THREAD_IDLE_TIME_S 
                             && nowThreadNum_ > initThreadNum_) {
-                            --idleThreadNum_;
-                            --nowThreadNum_;
-                            threads_.erase(threadNumber);
-                            std::cout << "remove thread: "
-                                << std::this_thread::get_id() << std::endl;
+                            removeThread(threadNumber);
                             return;
                         }
                     }
                 }
             } else {
                 //满足条件就继续执行, 否则一直阻塞在taskQueNotEmpty_条件变量上
-                taskQueNotEmpty_.wait(ulock, [&]() -> bool { return taskNum_ > 0;});
+                taskQueNotEmpty_.wait(ulock, [&]() -> bool { return !isStarted_ || taskNum_ > 0;});
+            }
+            //在线程池已停止且没有获取任务的情况下，销毁线程对象
+            if(!isStarted_ && taskNum_ <= 0) {
+                removeThread(threadNumber);
+                return;
             }
             std::cout << "thread: " << std::this_thread::get_id() 
                 << " get task!" << std::endl;
@@ -85,6 +93,8 @@ void ThreadPool::threadFunc(uint threadNumber) {
         ++idleThreadNum_;
         lastTime = std::chrono::high_resolution_clock::now();
     }
+    //结束时正在执行任务的线程，也需要释放线程对象
+    removeThread(threadNumber);
 }
 //运行
 void ThreadPool::start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum) {
@@ -93,10 +103,10 @@ void ThreadPool::start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum)
     maxThreadNum_ = poolMode_ == PoolMode::FIX_MODE ? 
         initThreadNum: std::max(initThreadNum, maxThreadNum);
     //创建并启动线程
+    isStarted_ = true;
     for(int i = 0; i < initThreadNum; ++i) {
         creatThread();
     }
-    isStarted_ = true;
 } 
 
 void ThreadPool::start(uint initThreaNum, PoolMode poolMode) {
@@ -115,6 +125,21 @@ uint ThreadPool::getThreadNumber() {
     return threadNumber_++;
 }
 
+//销毁线程会发生在多个工作线程中，需要加锁保证销毁正确数目的线程
+void ThreadPool::removeThread(uint threadNumber) {
+    std::unique_lock<std::mutex> ulock(threadNumberMutex_);
+    //加锁成功后，需要再次判断需要销毁当前线程对象
+    if(isStarted_ && nowThreadNum_ <= initThreadNum_) return;
+    --idleThreadNum_;
+    --nowThreadNum_;
+    threads_.erase(threadNumber);
+    //当要销毁线程池时，每销毁一个线程对象，就唤醒一次
+    removeThread_.notify_all();
+    std::cout << "remove thread: "
+        << std::this_thread::get_id() << std::endl;
+}
+
+//创建线程只会发生在用户提交任务时，此时不需要加锁
 void ThreadPool::creatThread() {
     uint threadNumber = getThreadNumber();
     std::unique_ptr<Thread> ptr = 
