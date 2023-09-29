@@ -46,14 +46,12 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     //删除拷贝赋值
     ThreadPool& operator= (const ThreadPool&) = delete;
-    //设置工作模式
-    void setPoolMode(PoolMode poolMode);
-    //设置任务队列中任务的最大数
-    void setTaskQueMaxNum(uint taskQueNum);
     //给线程池添加任务
     Result submitTask(std::shared_ptr<Task> task);
     //运行
-    void start(uint16_t threadNum);
+    void start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum_);
+    void start(uint initThreaNum, PoolMode poolMode);
+    void start(unit initThreadNum);
 private:
     //定义线程函数
     void threadFunc();
@@ -61,7 +59,9 @@ private:
     //线程列表
     std::vector<std::unique_ptr<Thread>> threads_; 
     //初始线程数量
-    uint16_t initThreadNum_;
+    uint initThreadNum_;
+    //线程数量的上限值
+    uint maxThreadNum_;
     //任务队列
     std::queue<std::shared_ptr<Task>> taskQue_;
     //当前任务数量
@@ -70,6 +70,8 @@ private:
     uint taskQueMaxNum_;
     //线程池的工作模式
     PoolMode poolMode_;
+    //当前线程池是否已经启动
+    std::atomic_bool isStarted_;
     
     //互斥锁，用于保障任务队列的线程安全
     std::mutex taskQueMutex_;

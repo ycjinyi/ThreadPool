@@ -14,17 +14,10 @@ void Thread::run() {
 //-------------------------------ThreadPool------------------------------
 //构造函数
 ThreadPool::ThreadPool(): initThreadNum_(0), taskQueNum_(0), 
+    maxThreadNum_(0), isStarted_(false),
     taskQueMaxNum_(TASK_QUE_MAX_NUM), poolMode_(PoolMode::FIX_MODE) {}
 //析构函数
 ThreadPool::~ThreadPool() {}
-//设置工作模式
-void ThreadPool::setPoolMode(PoolMode poolMode) {
-    poolMode_ = poolMode;
-}
-//设置任务队列中任务的最大数
-void ThreadPool::setTaskQueMaxNum(uint taskQueNum) {
-    taskQueMaxNum_ = taskQueNum;
-}
 //给线程池添加任务, 用户调用，作为生产者，返回执行结果Result
 Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
     std::unique_lock<std::mutex> ulock(taskQueMutex_);
@@ -57,17 +50,29 @@ void ThreadPool::threadFunc() {
     }
 }
 //运行
-void ThreadPool::start(uint16_t threadNum) {
-    initThreadNum_ = threadNum;
+void ThreadPool::start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum) {
+    initThreadNum_ = initThreadNum;
+    poolMode_ = poolMode;
+    maxThreadNum_ = poolMode_ == PoolMode::FIX_MODE ? 
+        initThreadNum: std::max(initThreadNum, maxThreadNum);
     //创建线程
-    for(int i = 0; i < initThreadNum_; ++i) {
+    for(int i = 0; i < initThreadNum; ++i) {
         std::unique_ptr<Thread> ptr = 
             std::make_unique<Thread> (std::bind(&ThreadPool::threadFunc, this));
         threads_.emplace_back(std::move(ptr));
     }
     //启动线程
     for(auto& thread: threads_) thread->run();
+    isStarted_ = true;
 } 
+
+void ThreadPool::start(uint initThreaNum, PoolMode poolMode) {
+    return start(initThreaNum, poolMode, initThreaNum);
+}
+
+void ThreadPool::start(uint initThreadNum) {
+    return start(initThreadNum, PoolMode::FIX_MODE, initThreadNum);
+}
 
 //-------------------------------Task------------------------------
 void Task::execute() {
