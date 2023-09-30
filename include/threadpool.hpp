@@ -52,7 +52,7 @@ public:
     //运行
     void start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum_);
     void start(uint initThreaNum, PoolMode poolMode);
-    void start(uint initThreadNum);
+    void start(uint initThreadNum = std::thread::hardware_concurrency());
     //获得线程编号
     uint getThreadNumber();
 private:
