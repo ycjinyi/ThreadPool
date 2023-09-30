@@ -23,7 +23,7 @@ int main() {
         // threadPool.submitTask(std::make_shared<MyTask> ());
         // threadPool.submitTask(std::make_shared<MyTask> ());
         //std::cout << res1.get().cast<int>() + res2.get().cast<int>() << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(4));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     std::cout << "main over!" << std::endl;
     return 0;

@@ -21,11 +21,16 @@ enum class PoolMode {
 //任务的抽象基类
 class Task {
 public:
+    Task();
     void execute();
     void setResult(Result*);
+    void setValid(bool);
+    std::mutex& getMutex();
     virtual Any run() = 0;
 private:
+    bool valid_;
     Result* result_;
+    std::mutex mutex_;
 };
 
 //线程类

@@ -6,6 +6,11 @@ Result::Result(std::shared_ptr<Task> task, bool valid): task_(task), valid_(vali
     task_->setResult(this);
 }
 
+//析构时，通知任务无效
+Result::~Result() {
+    task_->setValid(false);
+}
+
 // 获取任务运行结果，用户调用
 Any Result::get() {
     if(!valid_) {

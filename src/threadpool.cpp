@@ -151,11 +151,30 @@ void ThreadPool::creatThread() {
 }
 
 //-------------------------------Task------------------------------
+Task::Task(): valid_(true) {}
 void Task::execute() {
     if(result_ == nullptr) return;
+    {
+        std::unique_lock<std::mutex> ulock(mutex_);
+        if(!valid_) return;
+    }
     // 执行任务并设置返回值
-    result_->setValue(run());
+    Any res(run());
+    {
+        //保证在设置返回值时，接收对象还没有析构
+        std::unique_lock<std::mutex> ulock(mutex_);
+        if(!valid_) return;
+        result_->setValue(std::move(res));
+    }
 }
 void Task::setResult(Result* result) {
     result_ = result;
+}
+// 用于result析构时，反向设置任务无效，因为此时结果已经没有地方接收了
+void Task::setValid(bool valid) {
+    std::unique_lock<std::mutex> ulock(mutex_);
+    valid_ = valid;
+}
+std::mutex& Task::getMutex() {
+    return mutex_;
 }
