@@ -1,3 +1,4 @@
+#if 0
 #include "result.hpp"
 #include "threadpool.hpp"
 
@@ -25,3 +26,4 @@ void Result::setValue(Any res) {
     res_ = std::move(res);
     semaphore_.post();
 }
+#endif

@@ -29,6 +29,8 @@ ThreadPool::~ThreadPool() {
     //阻塞在removeThread_条件变量上，直到所有的线程对象都被销毁
     removeThread_.wait(ulock, [&]() -> bool { return nowThreadNum_ <= 0;});
 }
+
+#if !USE_FUTURE
 //给线程池添加任务, 用户调用，作为生产者，返回执行结果Result
 Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
     std::unique_lock<std::mutex> ulock(taskQueMutex_);
@@ -49,6 +51,7 @@ Result ThreadPool::submitTask(std::shared_ptr<Task> task) {
     }
     return Result(task);
 }
+
 //定义线程函数, 线程执行, 作为消费者
 void ThreadPool::threadFunc(uint threadNumber) {
     auto lastTime = std::chrono::high_resolution_clock::now();
@@ -96,6 +99,57 @@ void ThreadPool::threadFunc(uint threadNumber) {
     //结束时正在执行任务的线程，也需要释放线程对象
     removeThread(threadNumber);
 }
+
+#else
+//定义线程函数, 线程执行, 作为消费者
+void ThreadPool::threadFunc(uint threadNumber) {
+    auto lastTime = std::chrono::high_resolution_clock::now();
+    while(isStarted_) {
+        Task task;
+        {
+            std::unique_lock<std::mutex> ulock(taskQueMutex_);
+            //如果是cached模式，当线程总数大于初始线程数时，将回收空闲时间超过60s的线程
+            if(poolMode_ == PoolMode::CACHED_MODE) {
+                while(isStarted_ && taskNum_ <= 0) {
+                    if(std::cv_status::timeout ==
+                        taskQueNotEmpty_.wait_for(ulock, std::chrono::seconds(1))) {
+                        auto nowTime = std::chrono::high_resolution_clock::now();
+                        auto duration = std::chrono::duration_cast<std::chrono::seconds> (nowTime - lastTime);
+                        //如果超时，将回收当前线程，并减少计数和线程map中保存的线程对象
+                        if(duration.count() > MAX_THREAD_IDLE_TIME_S 
+                            && nowThreadNum_ > initThreadNum_) {
+                            removeThread(threadNumber);
+                            return;
+                        }
+                    }
+                }
+            } else {
+                //满足条件就继续执行, 否则一直阻塞在taskQueNotEmpty_条件变量上
+                taskQueNotEmpty_.wait(ulock, [&]() -> bool { return !isStarted_ || taskNum_ > 0;});
+            }
+            //在线程池已停止且没有获取任务的情况下，销毁线程对象
+            if(!isStarted_ && taskNum_ <= 0) {
+                removeThread(threadNumber);
+                return;
+            }
+            std::cout << "thread: " << std::this_thread::get_id() 
+                << " get task!" << std::endl;
+            --idleThreadNum_;
+            task = taskQue_.front();
+            taskQue_.pop();
+            --taskNum_;
+            if(taskNum_) taskQueNotEmpty_.notify_all();
+            taskQueNotFull_.notify_all();
+        }
+        if(task != nullptr) task();
+        ++idleThreadNum_;
+        lastTime = std::chrono::high_resolution_clock::now();
+    }
+    //结束时正在执行任务的线程，也需要释放线程对象
+    removeThread(threadNumber);
+}
+#endif
+
 //运行
 void ThreadPool::start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum) {
     initThreadNum_ = initThreadNum;
@@ -150,6 +204,7 @@ void ThreadPool::creatThread() {
     threads_.emplace(threadNumber, std::move(ptr));
 }
 
+#if !USE_FUTURE
 //-------------------------------Task------------------------------
 Task::Task(): valid_(true) {}
 void Task::execute() {
@@ -178,3 +233,4 @@ void Task::setValid(bool valid) {
 std::mutex& Task::getMutex() {
     return mutex_;
 }
+#endif

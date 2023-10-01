@@ -1,3 +1,4 @@
+#if 0
 #ifndef RESULT_H
 #define RESULT_H
 #include <memory>
@@ -22,4 +23,5 @@ private:
     std::shared_ptr<Task> task_;
     Semaphore semaphore_;
 };
+#endif
 #endif

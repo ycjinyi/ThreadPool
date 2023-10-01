@@ -9,15 +9,16 @@
 #include <condition_variable>
 #include <thread>
 #include <unordered_set>
+#include <future>
 
+#define USE_FUTURE 1
+
+#if !USE_FUTURE
 #include "any.hpp"
 #include "result.hpp"
+#endif
 
-//线程池的工作模式
-enum class PoolMode {
-    FIX_MODE, CACHED_MODE
-};
-
+#if !USE_FUTURE
 //任务的抽象基类
 class Task {
 public:
@@ -31,6 +32,12 @@ private:
     bool valid_;
     Result* result_;
     std::mutex mutex_;
+};
+#endif
+
+//线程池的工作模式
+enum class PoolMode {
+    FIX_MODE, CACHED_MODE
 };
 
 //线程类
@@ -52,8 +59,43 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     //删除拷贝赋值
     ThreadPool& operator= (const ThreadPool&) = delete;
+
     //给线程池添加任务
+    #if !USE_FUTURE
     Result submitTask(std::shared_ptr<Task> task);
+    #else
+    //采用可变参数模板
+    template<typename Func, typename ...Args>
+    auto submitTask(Func&& f, Args&& ...args) -> std::future<decltype(f(args...))> {
+        using RET_TYPE = decltype(f(args...));
+
+        std::unique_lock<std::mutex> ulock(taskQueMutex_);
+        if(!taskQueNotFull_.wait_for(ulock, std::chrono::seconds(1), 
+            [&]() -> bool { return taskNum_ < taskQueMaxNum_; })) {
+            //如果添加失败，就返回空
+            auto task = std::make_shared<std::packaged_task<RET_TYPE()>> 
+                ([]() -> RET_TYPE { return RET_TYPE();});
+            std::future<RET_TYPE> res = task->get_future();
+            (*task)();
+            return res;
+        };
+
+        //注意传入其它函数的所有使用了万能引用的参数，均需要完美转发
+        auto task = std::make_shared<std::packaged_task<RET_TYPE()>>
+            (std::bind(std::forward<Func>(f), std::forward<Args>(args)...));
+        std::future<RET_TYPE> res = task->get_future();
+        taskQue_.push([task]() { (*task)(); });
+        ++taskNum_;
+        taskQueNotEmpty_.notify_all();
+        if(poolMode_ == PoolMode::CACHED_MODE 
+            && idleThreadNum_ < taskNum_
+            && nowThreadNum_ < maxThreadNum_) {
+            creatThread();
+        }
+        return res;
+    }
+    #endif
+    
     //运行
     void start(uint initThreadNum, PoolMode poolMode, uint maxThreadNum_);
     void start(uint initThreaNum, PoolMode poolMode);
@@ -85,8 +127,13 @@ private:
     //销毁线程时用于线程数目的锁
     std::mutex threadNumberMutex_;
 
+    #if !USE_FUTURE
     //任务队列
     std::queue<std::shared_ptr<Task>> taskQue_;
+    #else
+    using Task = std::function<void ()>; 
+    std::queue<Task> taskQue_;
+    #endif
     //当前任务数量
     std::atomic_uint taskNum_;
     //任务的最大上限数
