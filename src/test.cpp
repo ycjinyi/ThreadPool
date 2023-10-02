@@ -13,7 +13,7 @@
 // };
 
 int sum(int a, int b) {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(200));
     return a + b;
 }
 
@@ -35,7 +35,7 @@ int main() {
         ThreadPool threadPool;
         threadPool.start(2, PoolMode::CACHED_MODE, 3);
         std::future<int> res1 = threadPool.submitTask(sum, 1, 3);
-        std::cout << res1.get() << std::endl;
+        //std::cout << res1.get() << std::endl;
         threadPool.submitTask(sum, 2, 4);
         threadPool.submitTask(sum, 2, 4);
         threadPool.submitTask([] (int c) { return c; }, 2);
